@@ -104,6 +104,10 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log("========== LOGIN DEBUG ==========");
+    console.log("Email received:", email);
+    console.log("Password received:", password ? "YES" : "NO");
+
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -117,7 +121,11 @@ export const loginUser = async (req, res) => {
       email: normalizedEmail,
     });
 
+    console.log("User found:", !!user);
+
     if (!user) {
+      console.log("❌ USER NOT FOUND");
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -126,7 +134,11 @@ export const loginUser = async (req, res) => {
 
     const isPasswordMatch = await bcrypt.compare(password, user.password);
 
+    console.log("Password match:", isPasswordMatch);
+
     if (!isPasswordMatch) {
+      console.log("❌ PASSWORD DOES NOT MATCH");
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -134,7 +146,7 @@ export const loginUser = async (req, res) => {
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is missing");
+      console.error("❌ JWT_SECRET is missing");
 
       return res.status(500).json({
         success: false,
@@ -144,18 +156,14 @@ export const loginUser = async (req, res) => {
 
     const token = createToken(user._id);
 
-    // ==========================================
-    // SET AUTH COOKIE
-    // ==========================================
-
     res.cookie("token", token, cookieOptions);
 
+    console.log("✅ LOGIN SUCCESS");
     console.log("✅ Auth cookie set");
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
-
       user: {
         _id: user._id,
         name: user.name,
