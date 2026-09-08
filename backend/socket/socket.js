@@ -11,15 +11,37 @@ const connectedUsers = new Map();
 // ==============================
 
 export const initializeSocket = (server) => {
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "https://chat-app-2-0.vercel.app",
+    process.env.CLIENT_URL,
+  ].filter(Boolean);
+
+  console.log("Socket.IO allowed origins:", allowedOrigins);
+
   io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL,
+      origin: (origin, callback) => {
+        // Allow requests without origin
+        // Example: server-to-server requests
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        console.log("❌ Socket.IO CORS blocked:", origin);
+
+        return callback(new Error("Not allowed by Socket.IO CORS"), false);
+      },
       credentials: true,
     },
   });
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
+    console.log("🟢 User connected:", socket.id);
 
     // ==============================
     // JOIN USER ROOM
@@ -50,8 +72,7 @@ export const initializeSocket = (server) => {
           lastSeen: null,
         });
 
-        console.log(`User ${userId} joined room`);
-
+        console.log(`👤 User ${userId} joined room`);
         console.log(`Active sockets for ${userId}:`, userSockets.size);
 
         // Broadcast online status
@@ -61,7 +82,7 @@ export const initializeSocket = (server) => {
           lastSeen: null,
         });
       } catch (error) {
-        console.error("Socket Join Error:", error);
+        console.error("❌ Socket Join Error:", error);
       }
     });
 
@@ -113,7 +134,7 @@ export const initializeSocket = (server) => {
 
     socket.on("disconnect", async () => {
       try {
-        console.log("User disconnected:", socket.id);
+        console.log("🔴 User disconnected:", socket.id);
 
         const userId = socket.userId;
 
@@ -138,7 +159,7 @@ export const initializeSocket = (server) => {
               lastSeen,
             });
 
-            console.log(`User ${userId} is offline`);
+            console.log(`👤 User ${userId} is offline`);
 
             // Broadcast offline status
             io.emit("userStatusChanged", {
@@ -153,7 +174,7 @@ export const initializeSocket = (server) => {
           }
         }
       } catch (error) {
-        console.error("Socket Disconnect Error:", error);
+        console.error("❌ Socket Disconnect Error:", error);
       }
     });
   });
