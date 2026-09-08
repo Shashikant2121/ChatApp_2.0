@@ -3,6 +3,10 @@ import jwt from "jsonwebtoken";
 
 import User from "../models/User.js";
 
+// ==========================================
+// CREATE JWT TOKEN
+// ==========================================
+
 const createToken = (userId) => {
   return jwt.sign(
     {
@@ -14,6 +18,21 @@ const createToken = (userId) => {
     },
   );
 };
+
+// ==========================================
+// COOKIE OPTIONS
+// ==========================================
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+// ==========================================
+// REGISTER
+// ==========================================
 
 export const registerUser = async (req, res) => {
   try {
@@ -77,6 +96,10 @@ export const registerUser = async (req, res) => {
   }
 };
 
+// ==========================================
+// LOGIN
+// ==========================================
+
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -111,7 +134,7 @@ export const loginUser = async (req, res) => {
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is missing in .env");
+      console.error("JWT_SECRET is missing");
 
       return res.status(500).json({
         success: false,
@@ -121,12 +144,13 @@ export const loginUser = async (req, res) => {
 
     const token = createToken(user._id);
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    // ==========================================
+    // SET AUTH COOKIE
+    // ==========================================
+
+    res.cookie("token", token, cookieOptions);
+
+    console.log("✅ Auth cookie set");
 
     return res.status(200).json({
       success: true,
@@ -152,6 +176,10 @@ export const loginUser = async (req, res) => {
   }
 };
 
+// ==========================================
+// GET CURRENT USER
+// ==========================================
+
 export const getCurrentUser = async (req, res) => {
   try {
     return res.status(200).json({
@@ -168,13 +196,19 @@ export const getCurrentUser = async (req, res) => {
   }
 };
 
+// ==========================================
+// LOGOUT
+// ==========================================
+
 export const logoutUser = async (req, res) => {
   try {
     res.clearCookie("token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      httpOnly: cookieOptions.httpOnly,
+      secure: cookieOptions.secure,
+      sameSite: cookieOptions.sameSite,
     });
+
+    console.log("✅ Auth cookie cleared");
 
     return res.status(200).json({
       success: true,
