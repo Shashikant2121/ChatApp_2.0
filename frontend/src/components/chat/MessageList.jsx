@@ -28,26 +28,30 @@ function MessageList({ conversation, newMessage }) {
       return;
     }
 
-    let isMounted = true;
+    let mounted = true;
 
     const fetchMessages = async () => {
       try {
         setLoading(true);
         setError("");
 
-        console.log("📩 Fetching messages:", conversationId);
+        console.log("Fetching messages:", conversationId);
 
         const data = await getMessages(conversationId);
 
-        console.log("📩 Messages response:", data);
+        console.log("Messages API response:", data);
 
-        if (!isMounted) return;
+        if (!mounted) {
+          return;
+        }
 
-        setMessages(data?.messages || []);
+        setMessages(Array.isArray(data?.messages) ? data.messages : []);
       } catch (error) {
-        console.error("❌ Fetch Messages Error:", error);
+        console.error("Fetch Messages Error:", error);
 
-        if (!isMounted) return;
+        if (!mounted) {
+          return;
+        }
 
         setMessages([]);
 
@@ -63,7 +67,7 @@ function MessageList({ conversation, newMessage }) {
           setError("Unable to load messages.");
         }
       } finally {
-        if (isMounted) {
+        if (mounted) {
           setLoading(false);
         }
       }
@@ -72,12 +76,12 @@ function MessageList({ conversation, newMessage }) {
     fetchMessages();
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, [conversationId]);
 
   // ==========================================
-  // NEW MESSAGE FROM SOCKET
+  // SOCKET NEW MESSAGE
   // ==========================================
 
   useEffect(() => {
@@ -86,23 +90,25 @@ function MessageList({ conversation, newMessage }) {
     }
 
     const handleNewMessage = (message) => {
-      const messageConversationId =
+      console.log("Socket newMessage:", message);
+
+      const receivedConversationId =
         message?.conversation?._id || message?.conversation;
 
-      if (messageConversationId?.toString() !== conversationId?.toString()) {
+      if (receivedConversationId?.toString() !== conversationId?.toString()) {
         return;
       }
 
-      setMessages((prevMessages) => {
-        const alreadyExists = prevMessages.some(
-          (existingMessage) => existingMessage._id === message._id,
+      setMessages((previousMessages) => {
+        const exists = previousMessages.some(
+          (item) => item?._id?.toString() === message?._id?.toString(),
         );
 
-        if (alreadyExists) {
-          return prevMessages;
+        if (exists) {
+          return previousMessages;
         }
 
-        return [...prevMessages, message];
+        return [...previousMessages, message];
       });
     };
 
@@ -122,23 +128,33 @@ function MessageList({ conversation, newMessage }) {
       return;
     }
 
+    console.log("Message sent from input:", newMessage);
+
     const messageConversationId =
       newMessage?.conversation?._id || newMessage?.conversation;
 
-    if (messageConversationId?.toString() !== conversationId?.toString()) {
+    /*
+      Sometimes backend may return conversation
+      as an object and sometimes as an ID.
+    */
+
+    if (
+      messageConversationId &&
+      messageConversationId.toString() !== conversationId.toString()
+    ) {
       return;
     }
 
-    setMessages((prevMessages) => {
-      const alreadyExists = prevMessages.some(
-        (message) => message._id === newMessage._id,
+    setMessages((previousMessages) => {
+      const exists = previousMessages.some(
+        (item) => item?._id?.toString() === newMessage?._id?.toString(),
       );
 
-      if (alreadyExists) {
-        return prevMessages;
+      if (exists) {
+        return previousMessages;
       }
 
-      return [...prevMessages, newMessage];
+      return [...previousMessages, newMessage];
     });
   }, [newMessage, conversationId]);
 
@@ -156,8 +172,8 @@ function MessageList({ conversation, newMessage }) {
         return;
       }
 
-      setMessages((prevMessages) =>
-        prevMessages.map((message) => {
+      setMessages((previousMessages) =>
+        previousMessages.map((message) => {
           const senderId = message?.sender?._id || message?.sender;
 
           if (senderId?.toString() === currentUser?._id?.toString()) {
@@ -222,7 +238,7 @@ function MessageList({ conversation, newMessage }) {
   }, [messages]);
 
   // ==========================================
-  // FORMAT FILE SIZE
+  // FILE SIZE
   // ==========================================
 
   const formatFileSize = (bytes) => {
@@ -262,7 +278,7 @@ function MessageList({ conversation, newMessage }) {
   };
 
   // ==========================================
-  // FORMAT TIME
+  // TIME
   // ==========================================
 
   const formatMessageTime = (date) => {
@@ -277,7 +293,7 @@ function MessageList({ conversation, newMessage }) {
   };
 
   // ==========================================
-  // FORMAT DATE
+  // DATE
   // ==========================================
 
   const formatMessageDate = (date) => {
@@ -325,7 +341,7 @@ function MessageList({ conversation, newMessage }) {
       <div className="flex flex-1 items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 shadow-sm dark:bg-blue-500/10">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-400 dark:border-t-transparent" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-400" />
           </div>
 
           <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
@@ -342,7 +358,7 @@ function MessageList({ conversation, newMessage }) {
 
   if (error) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-slate-50 dark:bg-slate-950 px-5">
+      <div className="flex flex-1 items-center justify-center bg-slate-50 px-5 dark:bg-slate-950">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-2xl dark:bg-red-500/10">
             ⚠️
@@ -361,15 +377,11 @@ function MessageList({ conversation, newMessage }) {
   }
 
   // ==========================================
-  // MESSAGES UI
+  // MESSAGE UI
   // ==========================================
 
   return (
-    <div className="relative flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 via-white to-blue-50/40 px-3 py-5 transition-colors duration-300 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20 sm:px-5">
-      <div className="pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-100/30 blur-3xl dark:bg-blue-500/5" />
-
-      <div className="pointer-events-none absolute bottom-20 right-0 h-64 w-64 rounded-full bg-violet-100/20 blur-3xl dark:bg-violet-500/5" />
-
+    <div className="relative flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 via-white to-blue-50/40 px-3 py-5 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20 sm:px-5">
       <div className="relative z-10 mx-auto flex max-w-4xl flex-col gap-3">
         {messages.length === 0 ? (
           <div className="flex flex-1 items-center justify-center py-24">
@@ -394,13 +406,21 @@ function MessageList({ conversation, newMessage }) {
             const isMine =
               senderId?.toString() === currentUser?._id?.toString();
 
-            const showDate =
-              index === 0 ||
-              new Date(message.createdAt).toDateString() !==
-                new Date(messages[index - 1]?.createdAt).toDateString();
+            const currentDate = message?.createdAt
+              ? new Date(message.createdAt).toDateString()
+              : "";
+
+            const previousDate = messages[index - 1]?.createdAt
+              ? new Date(messages[index - 1].createdAt).toDateString()
+              : "";
+
+            const showDate = index === 0 || currentDate !== previousDate;
 
             return (
-              <div key={message._id} className="animate-[fadeIn_0.2s_ease-out]">
+              <div
+                key={message?._id || `${message?.createdAt}-${index}`}
+                className="animate-[fadeIn_0.2s_ease-out]"
+              >
                 {showDate && (
                   <div className="my-5 flex items-center justify-center">
                     <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500">
@@ -412,18 +432,16 @@ function MessageList({ conversation, newMessage }) {
                 <div
                   className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                 >
-                  <div
-                    className={`group relative max-w-[85%] sm:max-w-[72%] ${
-                      isMine ? "items-end" : "items-start"
-                    }`}
-                  >
+                  <div className="max-w-[85%] sm:max-w-[72%]">
                     <div
-                      className={`overflow-hidden rounded-[20px] shadow-sm transition-all duration-200 hover:-translate-y-[1px] hover:shadow-md ${
+                      className={`overflow-hidden rounded-[20px] shadow-sm ${
                         isMine
-                          ? "rounded-br-md bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-blue-500/10"
+                          ? "rounded-br-md bg-gradient-to-br from-blue-600 to-violet-600 text-white"
                           : "rounded-bl-md border border-slate-100 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                       }`}
                     >
+                      {/* IMAGE */}
+
                       {message.messageType === "image" && message.mediaUrl && (
                         <a
                           href={message.mediaUrl}
@@ -434,23 +452,25 @@ function MessageList({ conversation, newMessage }) {
                           <img
                             src={message.mediaUrl}
                             alt={message.fileName || "Shared image"}
-                            className="max-h-[360px] w-full cursor-pointer object-cover transition duration-300 hover:scale-[1.02]"
+                            className="max-h-[360px] w-full cursor-pointer object-cover"
                           />
                         </a>
                       )}
+
+                      {/* FILE */}
 
                       {message.messageType === "file" && message.mediaUrl && (
                         <a
                           href={message.mediaUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`m-2 flex min-w-[230px] items-center gap-3 rounded-2xl p-3 transition ${
+                          className={`m-2 flex min-w-[230px] items-center gap-3 rounded-2xl p-3 ${
                             isMine
-                              ? "bg-white/15 hover:bg-white/20"
-                              : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800"
+                              ? "bg-white/15"
+                              : "bg-slate-50 dark:bg-slate-800"
                           }`}
                         >
-                          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white text-2xl shadow-sm dark:bg-slate-700">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-2xl shadow-sm dark:bg-slate-700">
                             {getFileIcon(message.mimeType)}
                           </div>
 
@@ -476,27 +496,21 @@ function MessageList({ conversation, newMessage }) {
                             </p>
                           </div>
 
-                          <div
-                            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
-                              isMine
-                                ? "bg-white/15 text-white"
-                                : "bg-white text-slate-500 shadow-sm dark:bg-slate-700 dark:text-slate-300"
-                            }`}
-                          >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm dark:bg-slate-700 dark:text-slate-300">
                             ↗
                           </div>
                         </a>
                       )}
 
+                      {/* TEXT */}
+
                       {message.text && (
-                        <p
-                          className={`break-words whitespace-pre-wrap px-4 pt-3 text-sm leading-6 ${
-                            message.messageType === "image" ? "pb-1" : ""
-                          }`}
-                        >
+                        <p className="break-words whitespace-pre-wrap px-4 pt-3 text-sm leading-6">
                           {message.text}
                         </p>
                       )}
+
+                      {/* TIME + READ */}
 
                       <div
                         className={`flex items-center justify-end gap-1 px-3 pb-2 pt-1 text-[10px] ${
@@ -509,11 +523,11 @@ function MessageList({ conversation, newMessage }) {
 
                         {isMine && (
                           <span
-                            className={`text-xs transition-colors ${
+                            className={
                               message.isRead
                                 ? "font-bold text-cyan-100"
                                 : "text-blue-200"
-                            }`}
+                            }
                             title={message.isRead ? "Read" : "Sent"}
                           >
                             {message.isRead ? "✓✓" : "✓"}

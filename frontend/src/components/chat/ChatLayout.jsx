@@ -3,8 +3,10 @@ import Sidebar from "./Sidebar";
 import ChatHeader from "./ChatHeader";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
+
 import { createConversation } from "../../services/conversationService";
 import { markMessagesAsRead } from "../../services/messageService";
+
 import socket from "../../services/socket";
 import { useAuth } from "../../context/AuthContext";
 
@@ -14,18 +16,22 @@ function ChatLayout() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversation, setConversation] = useState(null);
   const [conversationLoading, setConversationLoading] = useState(false);
+
   const [newMessage, setNewMessage] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
 
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
-  /* =========================
-     SOCKET CONNECTION
-  ========================= */
+  // ==========================================
+  // SOCKET CONNECTION
+  // ==========================================
+
   useEffect(() => {
     if (!currentUser?._id) return;
 
-    socket.connect();
+    if (!socket.connected) {
+      socket.connect();
+    }
 
     const handleConnect = () => {
       console.log("Socket connected:", socket.id);
@@ -41,20 +47,19 @@ function ChatLayout() {
 
     return () => {
       socket.off("connect", handleConnect);
-
-      if (socket.connected) {
-        socket.disconnect();
-      }
     };
-  }, [currentUser]);
+  }, [currentUser?._id]);
 
-  /* =========================
-     USER ONLINE / OFFLINE
-  ========================= */
+  // ==========================================
+  // USER ONLINE / OFFLINE
+  // ==========================================
+
   useEffect(() => {
     const handleUserStatusChanged = ({ userId, isOnline, lastSeen }) => {
       setSelectedUser((prevUser) => {
-        if (!prevUser) return prevUser;
+        if (!prevUser) {
+          return prevUser;
+        }
 
         if (prevUser._id?.toString() !== userId?.toString()) {
           return prevUser;
@@ -75,14 +80,19 @@ function ChatLayout() {
     };
   }, []);
 
-  /* =========================
-     TYPING EVENTS
-  ========================= */
+  // ==========================================
+  // TYPING EVENTS
+  // ==========================================
+
   useEffect(() => {
-    if (!currentUser?._id) return;
+    if (!currentUser?._id) {
+      return;
+    }
 
     const handleUserTyping = ({ senderId }) => {
-      if (!selectedUser?._id) return;
+      if (!selectedUser?._id) {
+        return;
+      }
 
       if (senderId?.toString() === selectedUser._id?.toString()) {
         setIsTyping(true);
@@ -90,7 +100,9 @@ function ChatLayout() {
     };
 
     const handleUserStoppedTyping = ({ senderId }) => {
-      if (!selectedUser?._id) return;
+      if (!selectedUser?._id) {
+        return;
+      }
 
       if (senderId?.toString() === selectedUser._id?.toString()) {
         setIsTyping(false);
@@ -104,20 +116,24 @@ function ChatLayout() {
       socket.off("userTyping", handleUserTyping);
       socket.off("userStoppedTyping", handleUserStoppedTyping);
     };
-  }, [currentUser, selectedUser]);
+  }, [currentUser?._id, selectedUser?._id]);
 
-  /* =========================
-     RESET TYPING
-  ========================= */
+  // ==========================================
+  // RESET TYPING WHEN USER CHANGES
+  // ==========================================
+
   useEffect(() => {
     setIsTyping(false);
-  }, [selectedUser]);
+  }, [selectedUser?._id]);
 
-  /* =========================
-     SELECT USER
-  ========================= */
+  // ==========================================
+  // SELECT USER
+  // ==========================================
+
   const handleSelectUser = async (user) => {
-    if (!user?._id) return;
+    if (!user?._id) {
+      return;
+    }
 
     try {
       setSelectedUser(user);
@@ -127,10 +143,13 @@ function ChatLayout() {
 
       setConversationLoading(true);
 
-      // Close mobile sidebar
       setShowMobileSidebar(false);
 
+      console.log("Creating conversation with:", user._id);
+
       const data = await createConversation(user._id);
+
+      console.log("Conversation response:", data);
 
       const newConversation = data?.conversation;
 
@@ -140,7 +159,10 @@ function ChatLayout() {
 
       setConversation(newConversation);
 
-      /* Mark messages as read */
+      // ==========================================
+      // MARK MESSAGES AS READ
+      // ==========================================
+
       try {
         await markMessagesAsRead(newConversation._id);
 
@@ -160,18 +182,26 @@ function ChatLayout() {
     }
   };
 
-  /* =========================
-     MESSAGE SENT
-  ========================= */
+  // ==========================================
+  // MESSAGE SENT
+  // ==========================================
+
   const handleMessageSent = (message) => {
+    console.log("Message sent successfully:", message);
+
     setNewMessage(message);
   };
 
+  // ==========================================
+  // RENDER
+  // ==========================================
+
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
-      {/* =========================
+      {/* ======================================
           MOBILE OVERLAY
-      ========================= */}
+      ====================================== */}
+
       {showMobileSidebar && (
         <button
           type="button"
@@ -181,9 +211,10 @@ function ChatLayout() {
         />
       )}
 
-      {/* =========================
+      {/* ======================================
           SIDEBAR
-      ========================= */}
+      ====================================== */}
+
       <Sidebar
         selectedUser={selectedUser}
         setSelectedUser={handleSelectUser}
@@ -191,17 +222,18 @@ function ChatLayout() {
         onCloseMobile={() => setShowMobileSidebar(false)}
       />
 
-      {/* =========================
+      {/* ======================================
           MAIN CHAT AREA
-      ========================= */}
+      ====================================== */}
+
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-        {/* =========================
+        {/* ====================================
             WELCOME SCREEN
-        ========================= */}
+        ==================================== */}
+
         {!selectedUser ? (
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8 sm:px-6">
             <div className="w-full max-w-md text-center">
-              {/* Icon */}
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 text-4xl shadow-lg shadow-blue-500/20 sm:h-24 sm:w-24 sm:text-5xl">
                 💬
               </div>
@@ -215,7 +247,6 @@ function ChatLayout() {
                 your friends.
               </p>
 
-              {/* Mobile open chats */}
               <button
                 type="button"
                 onClick={() => setShowMobileSidebar(true)}
@@ -227,24 +258,28 @@ function ChatLayout() {
 
               <div className="mt-8 hidden items-center justify-center gap-3 text-xs text-slate-400 md:flex dark:text-slate-500">
                 <span className="h-px w-10 bg-slate-200 dark:bg-slate-800" />
+
                 <span>Select a chat to continue</span>
+
                 <span className="h-px w-10 bg-slate-200 dark:bg-slate-800" />
               </div>
             </div>
           </div>
         ) : (
           <>
-            {/* =========================
+            {/* ==================================
                 CHAT HEADER
-            ========================= */}
+            ================================== */}
+
             <ChatHeader
               user={selectedUser}
               onOpenSidebar={() => setShowMobileSidebar(true)}
             />
 
-            {/* =========================
+            {/* ==================================
                 MESSAGES
-            ========================= */}
+            ================================== */}
+
             <div className="min-h-0 flex-1 overflow-hidden">
               {conversationLoading ? (
                 <div className="flex h-full items-center justify-center">
@@ -258,8 +293,7 @@ function ChatLayout() {
                 </div>
               ) : conversation ? (
                 <MessageList
-                  conversationId={conversation._id}
-                  currentUser={currentUser}
+                  conversation={conversation}
                   newMessage={newMessage}
                 />
               ) : (
@@ -277,15 +311,18 @@ function ChatLayout() {
               )}
             </div>
 
-            {/* =========================
+            {/* ==================================
                 TYPING INDICATOR
-            ========================= */}
+            ================================== */}
+
             {isTyping && (
               <div className="shrink-0 px-4 pb-2 sm:px-5">
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                   <span className="flex gap-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
                   </span>
 
@@ -294,13 +331,14 @@ function ChatLayout() {
               </div>
             )}
 
-            {/* =========================
+            {/* ==================================
                 MESSAGE INPUT
-            ========================= */}
+            ================================== */}
+
             {conversation && (
               <MessageInput
-                conversationId={conversation._id}
-                receiverId={selectedUser._id}
+                conversation={conversation}
+                user={selectedUser}
                 onMessageSent={handleMessageSent}
               />
             )}
